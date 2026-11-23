@@ -5,9 +5,14 @@ import { Board } from './components/Board';
 
 const COLORS = ['#3974e8','#e85c62','#24a47a','#9a62db','#e29332','#188ca5'];
 const id = () => crypto.randomUUID();
-const profile = () => {
-  const saved = localStorage.getItem('manipad-profile'); if (saved) return JSON.parse(saved) as { id:string; name:string; color:string };
-  const next = { id: id(), name: '', color: COLORS[Math.floor(Math.random()*COLORS.length)] }; localStorage.setItem('manipad-profile', JSON.stringify(next)); return next;
+type Profile = { id:string; secret:string; name:string; color:string };
+// `id` is public (shown to everyone in the room); `secret` never leaves this browser except in the join handshake,
+// and proves to the server that this browser owns `id` (and therefore the hand that belongs to it).
+const newSecret = () => `${id()}${id()}`.replace(/-/g, '');
+const profile = (): Profile => {
+  const saved = localStorage.getItem('manipad-profile');
+  if (saved) { const parsed = JSON.parse(saved) as Partial<Profile>; if (parsed.id) { const upgraded = { name: '', color: COLORS[0], ...parsed, secret: parsed.secret || newSecret() } as Profile; localStorage.setItem('manipad-profile', JSON.stringify(upgraded)); return upgraded; } }
+  const next = { id: id(), secret: newSecret(), name: '', color: COLORS[Math.floor(Math.random()*COLORS.length)] }; localStorage.setItem('manipad-profile', JSON.stringify(next)); return next;
 };
 
 export function App() {
@@ -51,7 +56,7 @@ function Room({ roomId }: { roomId:string }) {
   const tutorToken = localStorage.getItem(`manipad-tutor-${roomId}`) || undefined;
   useEffect(() => {
     if (!name) return;
-    const socket: Socket<ServerToClientEvents,ClientToServerEvents> = io({ auth: { roomId, participantId: initial.id, name, color: initial.color, tutorToken, version: 1 } }); socketRef.current = socket;
+    const socket: Socket<ServerToClientEvents,ClientToServerEvents> = io({ auth: { roomId, participantId: initial.id, secret: initial.secret, name, color: initial.color, tutorToken, version: 1 } }); socketRef.current = socket;
     socket.on('connect',()=>setStatus('connected')); socket.on('disconnect',()=>setStatus('offline')); socket.on('connect_error',(e)=>{setError(e.message);setStatus('error')}); socket.on('snapshot',setSnapshot); socket.on('presence',(participants)=>setSnapshot(s=>s?{...s,participants}:s));
     socket.on('cursor',({participantId,cursor,selection})=>setSnapshot(s=>s?{...s,participants:s.participants.map(p=>p.id===participantId?{...p,cursor,selection}:p)}:s));
     socket.on('reaction',({participantId,emoji,nonce})=>setSnapshot(s=>{ const p=s?.participants.find(x=>x.id===participantId); setReaction({emoji,name:p?.name||'Someone',nonce}); return s; }));

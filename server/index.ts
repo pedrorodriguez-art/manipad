@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { commandSchema, joinSchema } from '../src/shared/schemas.js';
 import type { ClientToServerEvents, ServerToClientEvents } from '../src/shared/types.js';
-import { RoomStore } from './room-store.js';
+import { RoomStore, type Room } from './room-store.js';
 
 const app = express(); const server = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, { cors: { origin: true }, maxHttpBufferSize: 8_000_000 });
@@ -20,21 +20,31 @@ io.use((socket, next) => {
   if (!parsed.success) return next(new Error('Invalid room details'));
   const room = store.get(parsed.data.roomId); if (!room) return next(new Error('Room not found'));
   if (room.participants.size >= 8 && !room.participants.has(parsed.data.participantId)) return next(new Error('Room is full'));
+  if (!store.claim(room, parsed.data.participantId, parsed.data.secret)) return next(new Error('This player is already in the room from another browser'));
   socket.data.join = parsed.data; next();
 });
+
+/** Each participant gets their own snapshot: private card faces are only sent to the owner of the hand. */
+function broadcastSnapshot(room: Room) {
+  for (const socketId of io.sockets.adapter.rooms.get(room.id) ?? []) {
+    const target = io.sockets.sockets.get(socketId); const viewer = target?.data.join?.participantId as string | undefined;
+    if (target && viewer) target.emit('snapshot', store.snapshotFor(room, viewer));
+  }
+}
 
 io.on('connection', (socket) => {
   const joinData = socket.data.join as ReturnType<typeof joinSchema.parse>;
   const room = store.get(joinData.roomId)!; const isTutor = store.isTutor(room, joinData.tutorToken);
   room.emptySince = undefined; room.participants.set(joinData.participantId, { id: joinData.participantId, name: joinData.name, color: joinData.color, isTutor, selection: [] });
-  socket.join(room.id); io.to(room.id).emit('snapshot', store.snapshot(room));
+  store.refreshHandLabels(room, joinData.participantId);
+  socket.join(room.id); broadcastSnapshot(room);
 
   socket.on('command', (raw, ack) => {
     const parsed = commandSchema.safeParse(raw);
     if (!parsed.success) return ack?.({ ok: false, message: 'Invalid board action' });
-    const changed = store.command(room, parsed.data as Parameters<typeof store.command>[1], joinData.participantId, isTutor);
-    if (!changed) return ack?.({ ok: false, message: room.locked && !isTutor ? 'The tutor locked the board' : 'Action unavailable' });
-    io.to(room.id).emit('snapshot', store.snapshot(room)); ack?.({ ok: true });
+    const result = store.command(room, parsed.data as Parameters<typeof store.command>[1], joinData.participantId, isTutor);
+    if (!result.ok) return ack?.(result);
+    broadcastSnapshot(room); ack?.({ ok: true });
   });
   socket.on('cursor', (payload) => {
     if (!Number.isFinite(payload?.cursor?.x) || !Number.isFinite(payload?.cursor?.y)) return;
@@ -47,7 +57,7 @@ io.on('connection', (socket) => {
     if (!isTutor) return ack?.({ ok: false });
     if (payload.action === 'lock') room.locked = true; else if (payload.action === 'unlock') room.locked = false;
     else if (payload.action === 'reset-view') io.to(room.id).emit('view:reset');
-    io.to(room.id).emit('snapshot', store.snapshot(room)); ack?.({ ok: true });
+    broadcastSnapshot(room); ack?.({ ok: true });
   });
   socket.on('disconnect', () => {
     room.participants.delete(joinData.participantId); if (room.participants.size === 0) room.emptySince = Date.now();

@@ -90,3 +90,35 @@ Esta seção separa a motivação original das escolhas observadas na implementa
 **Razão:** manter um resultado comum e consistente entre participantes.
 
 **Consequência:** funcionalidades colaborativas precisam considerar validação, concorrência e sincronização, além da interação local.
+
+### D-005 — Mãos privadas como regiões do quadro
+
+**Decisão atual:** cada participante pode ter uma mão: um retângulo no quadro, com a cor e o nome do dono. Cartas e montes colocados nela ficam virados para baixo; só o dono vê as frentes, e os demais veem os versos e a contagem. Isso substitui a ideia anterior do `TODO.md` (gaveta inferior com um baú no quadro).
+
+**Razão:** emular a mão de cartas de uma mesa física sem tirar as cartas do espaço compartilhado: todos continuam vendo onde estão e quantas são, e as cartas entram e saem da mão arrastando, como as demais peças.
+
+**Regras:**
+- Uma mão por pessoa; mãos não podem se sobrepor. Qualquer pessoa cria a própria mão; o tutor pode criar para qualquer participante.
+- Mover, redimensionar e apagar a mão, e tirar, virar ou apagar cartas dela: só o dono ou o tutor. Qualquer pessoa pode colocar uma carta na mão de outra (dar ou distribuir).
+- A carta pertence à mão quando é colocada (arrastada ou comprada) dentro dela — não basta estar sob o retângulo. Assim, criar ou esticar uma mão sobre cartas viradas não revela essas cartas.
+- Toda carta numa mão é guardada virada para baixo. Ao sair da mão, ao apagar a mão ou ao desfazer uma ação, nada é revelado; para jogar, o dono arrasta a carta para fora e a vira.
+- Cartas não se empilham dentro de uma mão. Mover a mão leva as cartas junto.
+- Se o dono sai, a mão continua oculta e aparece como ausente; ele volta a vê-la ao entrar de novo pelo mesmo navegador. O tutor pode apagá-la ou entregá-la, vazia, a outra pessoa. O tutor também não vê as cartas das mãos.
+
+**Consequência:** o quadro deixou de ser idêntico para todos os participantes (ver D-006).
+
+### D-006 — Estado filtrado por participante
+
+**Decisão atual:** o servidor envia a cada participante o seu próprio snapshot (`server/visibility.ts`). Informação oculta é removida, não apenas marcada: frente de cartas viradas para baixo (para todos), frente das cartas da mão de outra pessoa, ordem dos montes (só a carta de cima de um monte virado para cima é enviada) e `initialCards`. A atualização genérica de objetos só altera posição e tamanho de cartas, montes e mãos; virar, comprar e embaralhar passam pelos comandos próprios.
+
+**Razão:** o que chega ao navegador pode ser lido no devtools; esconder só na tela não protege a mão nem a ordem do baralho (D-004).
+
+**Consequência:** cartas viradas para baixo e montes não podem ser duplicados nem copiados pelo cliente (ele não conhece as frentes). Cada mudança gera um snapshot por participante (no máximo 8 por sala).
+
+### D-007 — Identidade do participante ligada a um segredo
+
+**Decisão atual:** além do `participantId` (público, aparece na lista de presença), o navegador guarda um segredo aleatório. A primeira entrada com um id o reivindica na sala; entradas seguintes com o mesmo id precisam do mesmo segredo.
+
+**Razão:** sem isso, bastaria copiar o id de outra pessoa para receber o snapshot dela e ver a sua mão.
+
+**Consequência:** a mesma pessoa em outro navegador entra como outro participante. O segredo vive só na memória da sala, que é temporária (D-003).

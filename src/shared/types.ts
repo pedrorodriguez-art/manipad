@@ -1,6 +1,6 @@
 export const PROTOCOL_VERSION = 1 as const;
 
-export type ObjectType = 'stroke' | 'text' | 'shape' | 'counter' | 'numberTile' | 'fractionBar' | 'card' | 'deck' | 'die' | 'pawn' | 'chip' | 'image';
+export type ObjectType = 'stroke' | 'text' | 'shape' | 'counter' | 'numberTile' | 'fractionBar' | 'card' | 'deck' | 'die' | 'pawn' | 'chip' | 'image' | 'region';
 export type Tool = 'select' | 'hand' | 'pencil' | 'highlighter' | 'eraser' | 'text' | 'rectangle' | 'ellipse' | 'line' | 'arrow';
 
 export interface BaseObject {
@@ -14,13 +14,19 @@ export interface ShapeObject extends BaseObject { type: 'shape'; shapeType: 'rec
 export interface CounterObject extends BaseObject { type: 'counter'; color: string; size: number; }
 export interface NumberTileObject extends BaseObject { type: 'numberTile'; value: number; color: string; }
 export interface FractionBarObject extends BaseObject { type: 'fractionBar'; parts: number; shaded: number; color: string; width: number; height: number; }
-export interface CardObject extends BaseObject { type: 'card'; rank: string; suit: '♠' | '♥' | '♦' | '♣'; faceUp: boolean; }
-export interface DeckObject extends BaseObject { type: 'deck'; cards: string[]; initialCards: string[]; faceUp: boolean; }
+/**
+ * `handId`: the hand (region) the card was placed in; set only by the server when the card is moved/drawn into a region.
+ * `peek`: never stored; the server sets it only in the snapshot sent to the owner of that hand.
+ */
+export interface CardObject extends BaseObject { type: 'card'; rank: string; suit: '♠' | '♥' | '♦' | '♣'; faceUp: boolean; handId?: string; peek?: boolean; }
+export interface DeckObject extends BaseObject { type: 'deck'; cards: string[]; initialCards: string[]; faceUp: boolean; handId?: string; }
 export interface DieObject extends BaseObject { type: 'die'; value: number; color: string; rollNonce: number; }
 export interface PawnObject extends BaseObject { type: 'pawn'; color: string; label?: string; }
 export interface ChipObject extends BaseObject { type: 'chip'; side: 'front' | 'back'; frontText: string; backText: string; frontColor: string; backColor: string; size: number; }
 export interface ImageObject extends BaseObject { type: 'image'; src: string; width: number; height: number; alt: string; }
-export type BoardObject = StrokeObject | TextObject | ShapeObject | CounterObject | NumberTileObject | FractionBarObject | CardObject | DeckObject | DieObject | PawnObject | ChipObject | ImageObject;
+/** A private hand: cards and decks whose center lies inside it are face-down and only the owner sees their faces. x/y is the top-left corner. */
+export interface RegionObject extends BaseObject { type: 'region'; width: number; height: number; ownerId: string; ownerName: string; color: string; }
+export type BoardObject = StrokeObject | TextObject | ShapeObject | CounterObject | NumberTileObject | FractionBarObject | CardObject | DeckObject | DieObject | PawnObject | ChipObject | ImageObject | RegionObject;
 
 export interface Participant { id: string; name: string; color: string; isTutor: boolean; cursor?: { x: number; y: number }; selection: string[]; }
 export interface RoomSnapshot { version: 1; roomId: string; objects: BoardObject[]; participants: Participant[]; locked: boolean; revision: number; }
@@ -38,7 +44,8 @@ export type BoardCommand =
   | { type: 'flipDeck'; id: string }
   | { type: 'mergeIntoDeck'; sourceId: string; targetId: string }
   | { type: 'flipCard'; id: string }
-  | { type: 'flipChip'; id: string };
+  | { type: 'flipChip'; id: string }
+  | { type: 'assignRegion'; id: string; ownerId: string; ownerName?: string; color?: string };
 
 export interface ServerToClientEvents {
   snapshot: (snapshot: RoomSnapshot) => void;
