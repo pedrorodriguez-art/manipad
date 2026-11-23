@@ -1,4 +1,8 @@
 import type { BoardCommand, BoardObject, CardObject, DeckObject } from './types.js';
+import { handOf, isPrivatizable, regionAt } from './regions.js';
+
+/** Fields a generic `update` may change on cards, decks and hands. Faces, deck contents and owners only change through dedicated commands. */
+const GEOMETRY_KEYS = new Set(['x', 'y', 'rotation', 'scaleX', 'scaleY', 'width', 'height', 'locked']);
 
 export interface BoardState { objects: BoardObject[]; revision: number; }
 const clone = <T>(value: T): T => structuredClone(value);
@@ -7,11 +11,27 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
   const next = clone(state); next.revision += 1;
   if (command.type === 'create') {
     if (next.objects.length >= 500 || next.objects.some((item) => item.id === command.object.id)) return state;
-    next.objects.push({ ...command.object, creator: actor, revision: next.revision, z: next.objects.length });
+    const created = { ...command.object, creator: actor, revision: next.revision, z: next.objects.length } as BoardObject;
+    if (created.type === 'card') delete created.peek;
+    if (created.type === 'card' || created.type === 'deck') delete created.handId;
+    if (created.type === 'region') created.rotation = 0;
+    next.objects.push(created);
   } else if (command.type === 'update') {
     const safePatch = { ...command.patch } as Record<string, unknown>;
     for (const key of ['id','type','creator','revision']) delete safePatch[key];
-    next.objects = next.objects.map((item) => command.ids.includes(item.id) && !item.locked ? { ...item, ...safePatch, revision: next.revision } as BoardObject : item);
+    const restricted = (item: BoardObject) => isPrivatizable(item) || item.type === 'region';
+    const patchFor = (item: BoardObject) => restricted(item) ? Object.fromEntries(Object.entries(safePatch).filter(([key]) => GEOMETRY_KEYS.has(key) && (item.type === 'region' ? key !== 'rotation' : key !== 'width' && key !== 'height'))) : safePatch;
+    // Moving a hand carries the cards in it (the ones not being moved explicitly by this same command).
+    const carried = new Map<string, { dx: number; dy: number }>();
+    for (const region of next.objects) {
+      if (region.type !== 'region' || !command.ids.includes(region.id) || region.locked) continue;
+      const patch = patchFor(region); const dx = typeof patch.x === 'number' ? patch.x - region.x : 0, dy = typeof patch.y === 'number' ? patch.y - region.y : 0;
+      if (dx || dy) for (const o of next.objects) if (!command.ids.includes(o.id) && !o.locked && handOf(next.objects, o)?.id === region.id) carried.set(o.id, { dx, dy });
+    }
+    next.objects = next.objects.map((item) => {
+      if (command.ids.includes(item.id) && !item.locked) return { ...item, ...patchFor(item), revision: next.revision } as BoardObject;
+      const shift = carried.get(item.id); return shift ? { ...item, x: item.x + shift.dx, y: item.y + shift.dy, revision: next.revision } : item;
+    });
   } else if (command.type === 'delete') {
     const imageIds = new Set(next.objects.filter((item) => command.ids.includes(item.id) && item.type === 'image' && !item.locked).map((item) => item.id));
     next.objects = next.objects.filter((item) => (!command.ids.includes(item.id) || item.locked) && !(item.type === 'stroke' && item.parentImageId && imageIds.has(item.parentImageId)));
@@ -24,6 +44,7 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
   } else if (command.type === 'rollDie') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'die' ? { ...o, value: 1 + Math.floor(Math.random() * 6), rollNonce: o.rollNonce + 1, revision: next.revision } : o);
   else if (command.type === 'flipCard') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'card' ? { ...o, faceUp: !o.faceUp, revision: next.revision } : o);
   else if (command.type === 'flipDeck') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'deck' ? { ...o, cards: [...o.cards].reverse(), faceUp: !o.faceUp, revision: next.revision } : o);
+  else if (command.type === 'assignRegion') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'region' ? { ...o, ownerId: command.ownerId, ownerName: command.ownerName ?? o.ownerName, color: command.color ?? o.color, revision: next.revision } : o);
   else if (command.type === 'flipChip') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'chip' ? { ...o, side: o.side === 'front' ? 'back' : 'front', revision: next.revision } : o);
   else if (command.type === 'shuffleDeck') next.objects = next.objects.map((o) => {
     if (o.id !== command.id || o.type !== 'deck') return o;
@@ -63,7 +84,7 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
       next.objects.push({ id: `card-${crypto.randomUUID()}`, type: 'card', x: landing.x, y: landing.y, rotation: 0, scaleX: 1, scaleY: 1, z: next.objects.length, locked: false, creator: `deck:${deck.id}`, revision: next.revision, rank: code.slice(0,-1), suit: suits[Number(code.slice(-1))] ?? '♠', faceUp: command.type === 'drawAndFlip' ? true : deck.faceUp });
     }
   }
-  next.objects = normalizeDecks(next.objects, next.revision);
+  next.objects = normalizeHands(state.objects, normalizeDecks(next.objects, next.revision), next.revision);
   return next;
 }
 
@@ -76,6 +97,26 @@ function normalizeDecks(objects: BoardObject[], revision: number): BoardObject[]
     if (object.cards.length === 0) return [];
     if (object.cards.length > 1) return [object];
     const code = object.cards[0];
-    return [{ id: object.id, type: 'card', x: object.x, y: object.y, rotation: object.rotation, scaleX: object.scaleX, scaleY: object.scaleY, z: object.z, locked: object.locked, creator: object.creator, revision, rank: code.slice(0, -1), suit: suits[Number(code.slice(-1))] ?? '♠', faceUp: object.faceUp }];
+    return [{ id: object.id, type: 'card', x: object.x, y: object.y, rotation: object.rotation, scaleX: object.scaleX, scaleY: object.scaleY, z: object.z, locked: object.locked, creator: object.creator, revision, rank: code.slice(0, -1), suit: suits[Number(code.slice(-1))] ?? '♠', faceUp: object.faceUp, ...(object.handId ? { handId: object.handId } : {}) }];
+  });
+}
+
+/**
+ * Keeps hand membership and the face-down invariant:
+ * - a card/deck whose position changed (or that was just created) joins the region it now lies in, or leaves its hand;
+ * - a member that no longer lies inside its region (the region was resized or deleted) leaves the hand;
+ * - every member is stored face-down, so nothing is revealed when it leaves the hand, the hand is deleted or an action is undone.
+ */
+export function normalizeHands(previous: BoardObject[], objects: BoardObject[], revision: number): BoardObject[] {
+  const before = new Map(previous.map((o) => [o.id, o]));
+  return objects.map((o) => {
+    if (!isPrivatizable(o)) return o;
+    const old = before.get(o.id);
+    const moved = !old || old.x !== o.x || old.y !== o.y || old.type !== o.type;
+    const handId = moved ? regionAt(objects, o)?.id : handOf(objects, o)?.id;
+    if (handId === o.handId && !(handId && o.faceUp)) return o;
+    const next = { ...o, revision } as typeof o;
+    if (handId) { next.handId = handId; next.faceUp = false; } else delete next.handId;
+    return next;
   });
 }
