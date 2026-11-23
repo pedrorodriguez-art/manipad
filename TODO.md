@@ -13,7 +13,7 @@
 
 
 - [ ] Add a thing: grid, with variable number of rows and columns. The objects placed on top of the grid should snap to the grid's cells if their center is close enough to a cell's center. The grid can have cells of two colors, in a checkers pattern (a color can also be transparent to allow for cells with no fill).
-- [ ] Create a private area for each active user. It must be displayed as a bottom drawer. Users can freely drag things between the whiteboard and the private area. Things in a user's private area can't be seen by other users. A private area is represented in the whiteboard as a chest with a letter, which can changed by the chest's owner.
+- [X] Create a private area for each active user (implemented as private hands: a region on the board, see D-005 in VISAO_E_DECISOES.md, instead of a bottom drawer with a chest).
 
 
 
@@ -23,3 +23,6 @@
 - [ ] Add a thing: dominoes
 - [ ] Add a thing: cartesian plane
 - [ ] Add a thing: number cards (square, stackable)
+
+- [ ] Import card decks from Naipe (https://luccoelho.github.io/TCC/) JSON exports. Waiting for a real export sample (docs/naipe-exemplo.json) before writing the parser.
+- [ ] Card images are not yet supported; the snapshot still carries pasted images inline (data URLs), which is costly since the whole snapshot is resent on each change.
