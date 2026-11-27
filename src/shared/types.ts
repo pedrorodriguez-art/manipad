@@ -21,7 +21,12 @@ export interface FractionBarObject extends BaseObject { type: 'fractionBar'; par
  */
 export interface CardObject extends BaseObject { type: 'card'; rank: string; suit: '♠' | '♥' | '♦' | '♣'; faceUp: boolean; face?: string; handId?: string; peek?: boolean; }
 export interface DeckObject extends BaseObject { type: 'deck'; cards: string[]; initialCards: string[]; faceUp: boolean; handId?: string; }
-export interface DieObject extends BaseObject { type: 'die'; value: number; color: string; rollNonce: number; }
+/**
+ * `value` is the face showing (1..sides), always rolled by the server; `rollNonce` grows on every roll so clients can animate it.
+ * `sides` defaults to 6. `faces`, when set, has one entry per side; an `image` is a URL served by the room (see D-010).
+ */
+export interface DieFace { text?: string; image?: string; }
+export interface DieObject extends BaseObject { type: 'die'; value: number; color: string; rollNonce: number; sides?: number; faces?: DieFace[]; }
 export interface PawnObject extends BaseObject { type: 'pawn'; color: string; label?: string; }
 export interface ChipObject extends BaseObject { type: 'chip'; side: 'front' | 'back'; frontText: string; backText: string; frontColor: string; backColor: string; size: number; }
 export interface ImageObject extends BaseObject { type: 'image'; src: string; width: number; height: number; alt: string; }
@@ -50,6 +55,10 @@ export type BoardCommand =
   | { type: 'clear' }
   | { type: 'undo' | 'redo' }
   | { type: 'rollDie'; id: string }
+  /** Rolls several dice in one step (one undo). */
+  | { type: 'rollDice'; ids: string[] }
+  /** Changes a die's faces and color; face pictures may be data URLs (stored by the server) or URLs the room already serves. */
+  | { type: 'editDie'; id: string; sides: number; faces?: DieFace[]; color: string }
   | { type: 'shuffleDeck' | 'drawAndFlip' | 'resetDeck'; id: string }
   | { type: 'drawCard'; id: string; position?: { x: number; y: number } }
   | { type: 'flipDeck'; id: string }

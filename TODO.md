@@ -18,12 +18,13 @@
 
 
 - [ ] Improve UI for editing chips
-- [ ] There should be animations for shuffling and rolling a die.
+- [ ] There should be animations for shuffling and rolling a die. (Rolling: done, see D-010.)
 - [ ] Things need to allow for more customization than currently allowed. Fraction bars could be configured (colors, numerator, denominator); number tiles could have controls to increase/decrease number of even to type a number.
 - [ ] Add a thing: dominoes
 - [ ] Add a thing: cartesian plane
 - [ ] Add a thing: number cards (square, stackable)
 
+- [X] Custom dice: 2 to 20 faces, text or picture faces, rolled by the server (see D-010).
 - [X] Make a deck from image files, one card per image (see D-009 in VISAO_E_DECISOES.md).
 - [X] Import card decks from Naipe (https://luccoelho.github.io/TCC/) JSON exports (see D-008 in VISAO_E_DECISOES.md; sample in `example/`).
 - [ ] Naipe import: bring card images along. The export only has `image_path` (null in the sample); we need an export that embeds the files (or a zip) to show them.

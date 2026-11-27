@@ -27,6 +27,15 @@ Cards keep the proportions of the Naipe blueprint and show their fields in order
 
 Any pictures can become a deck: open **Things** and tap **Deck from images**, then pick one or more image files. Each image becomes one card, in file-name order (*card 2* comes before *card 10*), with the first one on top of a face-down deck. Cards take the shape of the first image; the others are fitted inside it without cropping. Up to 60 images at a time; the browser shrinks them before sending. To try it, pick the fraction cards in `example/imagens/`.
 
+## Dice
+
+Tap **Die** under *Tabletop* for a classic six-sided die, or **Custom die** for one with 2 to 20 faces (d4, d6, d8, d10, d12, d20 are one tap away). A custom die can have its own color and, on each face, a short text (up to 12 characters) or a picture; faces left empty show their number.
+
+- **Rolling:** double-tap a die, or select one or more dice and tap **Roll** (*Roll 3 dice* rolls them together, as one action). Under *Roll dice with*, each person can switch to rolling with a single tap; the choice is kept by their browser.
+- **Fair rolls:** every value is drawn by the server, so everyone sees the same result and no one can pick it from their browser. A new or duplicated die also starts on a face drawn by the server.
+- **Editing:** select a die and tap **Edit die**. Dice move, duplicate and delete like any other thing.
+- Face pictures are shrunk by the browser and kept by the server, which sends only their address, like the pictures of image decks.
+
 ## Run locally
 
 Requires Node.js 20 or newer.
