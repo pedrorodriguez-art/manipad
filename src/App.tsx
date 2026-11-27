@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type { BoardCommand, BoardObject, ClientToServerEvents, Participant, RoomSnapshot, ServerToClientEvents, Tool } from './shared/types';
 import { Board } from './components/Board';
+import { BoardFileMenu } from './components/BoardFileMenu';
 
 const COLORS = ['#3974e8','#e85c62','#24a47a','#9a62db','#e29332','#188ca5'];
 const id = () => crypto.randomUUID();
@@ -68,7 +69,7 @@ function Room({ roomId }: { roomId:string }) {
   const me = snapshot?.participants.find(p=>p.id===initial.id);
   const emit = (command:BoardCommand,done?:(ok:boolean)=>void)=>socketRef.current?.emit('command',command,(result)=>{if(!result.ok)setError(result.message||'Action unavailable');done?.(result.ok);});
   return <div className="room-shell">
-    <header className="room-bar"><a href="/" className="room-brand"><Brand small/></a><div className="room-code"><span>ROOM</span><strong>{roomId}</strong><button title="Copy room link" onClick={()=>navigator.clipboard?.writeText(location.href)}>⧉</button></div><div className="room-spacer"/><div className="presence">{snapshot?.participants.slice(0,5).map(p=><span key={p.id} title={`${p.name}${p.isTutor?' · Tutor':''}`} style={{background:p.color}}>{p.name.slice(0,1).toUpperCase()}</span>)}</div><span className={`connection ${status}`}><i/>{status==='connected'?'Live':status}</span></header>
+    <header className="room-bar"><a href="/" className="room-brand"><Brand small/></a><div className="room-code"><span>ROOM</span><strong>{roomId}</strong><button title="Copy room link" onClick={()=>navigator.clipboard?.writeText(location.href)}>⧉</button></div><div className="room-spacer"/>{me?.isTutor&&tutorToken&&<BoardFileMenu roomId={roomId} tutorToken={tutorToken} onError={setError}/>}<div className="presence">{snapshot?.participants.slice(0,5).map(p=><span key={p.id} title={`${p.name}${p.isTutor?' · Tutor':''}`} style={{background:p.color}}>{p.name.slice(0,1).toUpperCase()}</span>)}</div><span className={`connection ${status}`}><i/>{status==='connected'?'Live':status}</span></header>
     {snapshot ? <Board snapshot={snapshot} me={me!} emit={emit} sendCursor={(cursor,selection)=>socketRef.current?.volatile.emit('cursor',{cursor,selection})} react={emoji=>socketRef.current?.emit('reaction',emoji)} control={action=>socketRef.current?.emit('control',{action})} onError={setError}/> : <div className="loading"><div className="spinner"/><p>Opening your room…</p></div>}
     {error && <button className="toast error-toast" onClick={()=>setError('')}>{error}<span>×</span></button>}
     {reaction && <div key={reaction.nonce} className="reaction-pop"><b>{reaction.emoji}</b><span>{reaction.name}</span></div>}

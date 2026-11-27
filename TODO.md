@@ -24,6 +24,7 @@
 - [ ] Add a thing: cartesian plane
 - [ ] Add a thing: number cards (square, stackable)
 
+- [X] Save the whole board to a file and open it again (tutor only, see D-011).
 - [X] Custom dice: 2 to 20 faces, text or picture faces, rolled by the server (see D-010).
 - [X] Make a deck from image files, one card per image (see D-009 in VISAO_E_DECISOES.md).
 - [X] Import card decks from Naipe (https://luccoelho.github.io/TCC/) JSON exports (see D-008 in VISAO_E_DECISOES.md; sample in `example/`).

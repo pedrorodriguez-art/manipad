@@ -36,6 +36,14 @@ Tap **Die** under *Tabletop* for a classic six-sided die, or **Custom die** for 
 - **Editing:** select a die and tap **Edit die**. Dice move, duplicate and delete like any other thing.
 - Face pictures are shrunk by the browser and kept by the server, which sends only their address, like the pictures of image decks.
 
+## Saving and opening boards
+
+The tutor can keep a board for another session: **Board file** (top bar) → **Export board** downloads a `.json` file with everything on the table, including face-down cards, the order of every deck, hands, imported and image decks, and dice with their faces. Pictures go inside the file, so it does not depend on the room it came from.
+
+**Board file** → **Import board…** opens a saved file in the current room. After a confirmation (*it replaces the board for everyone in this room*), everyone gets the new board at once and their views are fitted to it. Opening a board cannot be undone. Hands keep their owners: whoever comes back from the same browser finds their hand again; the tutor can give the others away.
+
+Only the tutor sees this menu: the file holds every hidden card, and opening one changes the board for everyone. Files from newer versions of ManiPad, damaged files and files over 45 MB are refused with a message, and the board stays as it was. The format is described in `src/shared/boardFile.ts`.
+
 ## Run locally
 
 Requires Node.js 20 or newer.

@@ -33,11 +33,15 @@ const sides = z.number().int().min(DIE_LIMITS.minSides).max(DIE_LIMITS.maxSides)
 const dieFaces = z.array(dieFace).min(DIE_LIMITS.minSides).max(DIE_LIMITS.maxSides);
 const dieFields = z.object({ value: z.number().int().min(1).max(DIE_LIMITS.maxSides), color: hexColor, rollNonce: z.number().int().nonnegative(), sides: sides.optional(), faces: dieFaces.optional() })
   .refine((die) => die.value <= (die.sides ?? 6) && (!die.faces || die.faces.length === (die.sides ?? 6)));
-export const cardSetSchema = z.object({
+const cardSetShape = (image: z.ZodString) => z.object({
   name: z.string().trim().min(1).max(CARD_SET_LIMITS.name),
   widthMm: finite.min(10).max(500), heightMm: finite.min(10).max(500),
-  faces: z.array(z.object({ fields: z.array(z.object({ name: z.string().max(CARD_SET_LIMITS.name), kind: z.enum(['text','icon','image']), text: z.string().max(CARD_SET_LIMITS.text) })).max(CARD_SET_LIMITS.fields), image: z.string().max(CARD_SET_LIMITS.imageChars).regex(CARD_IMAGE_DATA_URL).optional() })).min(1).max(CARD_SET_LIMITS.faces),
+  faces: z.array(z.object({ fields: z.array(z.object({ name: z.string().max(CARD_SET_LIMITS.name), kind: z.enum(['text','icon','image']), text: z.string().max(CARD_SET_LIMITS.text) })).max(CARD_SET_LIMITS.fields), image: image.optional() })).min(1).max(CARD_SET_LIMITS.faces),
 });
+/** A set as `importDeck` brings it: pictures are data URLs. */
+export const cardSetSchema = cardSetShape(z.string().max(CARD_SET_LIMITS.imageChars).regex(CARD_IMAGE_DATA_URL));
+/** A set as the room keeps it: pictures are URLs the room serves. Used to check board files (see server/board-file.ts). */
+export const storedCardSetSchema = cardSetShape(z.string().regex(ROOM_IMAGE_URL)).extend({ id: z.string().regex(/^s\d{1,3}$/) });
 
 export const boardObjectSchema = base.superRefine((value, ctx) => {
   if (!OBJECT_TYPES.includes(value.type)) { ctx.addIssue({ code: 'custom', message: 'Unknown object type' }); return; }
