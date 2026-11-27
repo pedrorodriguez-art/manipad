@@ -23,6 +23,10 @@ Card decks made in [Naipe](https://luccoelho.github.io/TCC/) can be brought to t
 
 Cards keep the proportions of the Naipe blueprint and show their fields in order: the first text as the title, then the art area, longer texts, and short values (e.g. *Custo 3 · Poder 2/4*) at the bottom. Images and icons are placeholders for now, because the export does not carry the image files.
 
+## Decks from images
+
+Any pictures can become a deck: open **Things** and tap **Deck from images**, then pick one or more image files. Each image becomes one card, in file-name order (*card 2* comes before *card 10*), with the first one on top of a face-down deck. Cards take the shape of the first image; the others are fitted inside it without cropping. Up to 60 images at a time; the browser shrinks them before sending. To try it, pick the fraction cards in `example/imagens/`.
+
 ## Run locally
 
 Requires Node.js 20 or newer.

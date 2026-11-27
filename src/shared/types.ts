@@ -31,8 +31,12 @@ export type BoardObject = StrokeObject | TextObject | ShapeObject | CounterObjec
 
 /** One field of an imported card face, in the order the source defines them. */
 export interface CardField { name: string; kind: 'text' | 'icon' | 'image'; text: string; }
-export interface CardFace { fields: CardField[]; }
-/** An imported collection of card faces (e.g. from Naipe). Room-wide and append-only; cards and decks refer to faces by code. */
+/**
+ * `image`: a picture covering the whole face (decks made from image files). Clients send it as a data URL in `importDeck`;
+ * the server keeps the bytes and replaces it with a URL it serves (see `cardImageUrl` in room-store.ts), so snapshots stay small.
+ */
+export interface CardFace { fields: CardField[]; image?: string; }
+/** An imported collection of card faces (from Naipe or from image files). Room-wide and append-only; cards and decks refer to faces by code. */
 export interface CardSet { id: string; name: string; widthMm: number; heightMm: number; faces: CardFace[]; }
 
 export interface Participant { id: string; name: string; color: string; isTutor: boolean; cursor?: { x: number; y: number }; selection: string[]; }

@@ -18,11 +18,13 @@ const cardFields = z.object({ rank: z.string().max(39), suit: z.enum(['♠','♥
 const deckFields = z.object({ cards: z.array(cardCode).max(500), initialCards: z.array(cardCode).max(500), faceUp: z.boolean() });
 const regionFields = z.object({ width: finite.min(80).max(4000), height: finite.min(60).max(4000), ownerId: z.string().min(1).max(80) });
 
-export const CARD_SET_LIMITS = { faces: 200, fields: 20, name: 60, text: 400, perRoom: 10 } as const;
+export const CARD_SET_LIMITS = { faces: 200, fields: 20, name: 60, text: 400, perRoom: 10, imageChars: 400_000, imageBytesPerRoom: 30_000_000 } as const;
+/** Card images arrive as base64 data URLs of a raster format (never SVG or a link), already downscaled by the browser. */
+export const CARD_IMAGE_DATA_URL = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
 export const cardSetSchema = z.object({
   name: z.string().trim().min(1).max(CARD_SET_LIMITS.name),
   widthMm: finite.min(10).max(500), heightMm: finite.min(10).max(500),
-  faces: z.array(z.object({ fields: z.array(z.object({ name: z.string().max(CARD_SET_LIMITS.name), kind: z.enum(['text','icon','image']), text: z.string().max(CARD_SET_LIMITS.text) })).max(CARD_SET_LIMITS.fields) })).min(1).max(CARD_SET_LIMITS.faces),
+  faces: z.array(z.object({ fields: z.array(z.object({ name: z.string().max(CARD_SET_LIMITS.name), kind: z.enum(['text','icon','image']), text: z.string().max(CARD_SET_LIMITS.text) })).max(CARD_SET_LIMITS.fields), image: z.string().max(CARD_SET_LIMITS.imageChars).regex(CARD_IMAGE_DATA_URL).optional() })).min(1).max(CARD_SET_LIMITS.faces),
 });
 
 export const boardObjectSchema = base.superRefine((value, ctx) => {

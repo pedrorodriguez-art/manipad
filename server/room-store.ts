@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { BoardCommand, BoardObject, CardSet, DeckObject, Participant, RoomSnapshot } from '../src/shared/types.js';
-import { CARD_SET_LIMITS } from '../src/shared/schemas.js';
+import { CARD_IMAGE_DATA_URL, CARD_SET_LIMITS } from '../src/shared/schemas.js';
 import { applyCommand } from '../src/shared/engine.js';
 import { authorize } from './permissions.js';
 import { projectObjects } from './visibility.js';
@@ -12,8 +12,12 @@ export interface Room {
   secrets: Map<string, Buffer>;
   /** Imported card faces. Append-only (undo and clear keep them), so putting a hidden card into a deck never changes what is sent. */
   cardSets: CardSet[];
+  /** Bytes of card images, by random token; served at `cardImageUrl(room, token)`. Kept as long as the set (append-only). */
+  cardImages: Map<string, { type: string; data: Buffer }>;
   emptySince?: number;
 }
+
+export const cardImageUrl = (room: Room, token: string) => `/api/rooms/${encodeURIComponent(room.id)}/card-images/${token}`;
 
 export type CommandResult = { ok: true } | { ok: false; message: string };
 
@@ -26,7 +30,7 @@ export class RoomStore {
   create(): Room {
     let id = '';
     do id = `${wordsA[Math.floor(Math.random()*wordsA.length)]}-${wordsB[Math.floor(Math.random()*wordsB.length)]}-${Math.floor(10+Math.random()*90)}`; while (this.rooms.has(id));
-    const room: Room = { id, tutorToken: randomBytes(24).toString('base64url'), objects: [], participants: new Map(), locked: false, revision: 0, history: [], future: [], secrets: new Map(), cardSets: [] };
+    const room: Room = { id, tutorToken: randomBytes(24).toString('base64url'), objects: [], participants: new Map(), locked: false, revision: 0, history: [], future: [], secrets: new Map(), cardSets: [], cardImages: new Map() };
     this.rooms.set(id, room); return room;
   }
   get(id: string) { return this.rooms.get(id); }
@@ -65,12 +69,21 @@ export class RoomStore {
   /** Registers the set, then places a face-down deck with its first card on top (an ordinary, undoable `create`). */
   private importDeck(room: Room, command: Extract<BoardCommand, { type: 'importDeck' }>, actor: string): CommandResult {
     if (room.cardSets.length >= CARD_SET_LIMITS.perRoom) return { ok: false, message: `A room can have at most ${CARD_SET_LIMITS.perRoom} imported decks` };
-    const set: CardSet = { ...command.set, id: `s${room.cardSets.length + 1}` };
+    const images = new Map<string, { type: string; data: Buffer }>();
+    const faces = command.set.faces.map((face) => {
+      if (!face.image) return face;
+      const match = CARD_IMAGE_DATA_URL.exec(face.image); if (!match) return { fields: face.fields };
+      const token = randomBytes(12).toString('base64url'); images.set(token, { type: match[1], data: Buffer.from(match[2], 'base64') });
+      return { ...face, image: cardImageUrl(room, token) };
+    });
+    const used = [...room.cardImages.values(), ...images.values()].reduce((sum, image) => sum + image.data.length, 0);
+    if (used > CARD_SET_LIMITS.imageBytesPerRoom) return { ok: false, message: 'This room has no space left for more card images' };
+    const set: CardSet = { ...command.set, faces, id: `s${room.cardSets.length + 1}` };
     const cards = set.faces.map((_, i) => `${set.id}:${i}`).reverse();
     const deck: DeckObject = { id: command.id, type: 'deck', x: command.position.x, y: command.position.y, rotation: 0, scaleX: 1, scaleY: 1, z: 0, locked: false, creator: actor, revision: 0, cards, initialCards: [...cards], faceUp: false };
     if (room.objects.some((o) => o.id === deck.id)) return { ok: false, message: 'Action unavailable' };
     const result = this.command(room, { type: 'create', object: deck }, actor, true);
-    if (result.ok) room.cardSets.push(set);
+    if (result.ok) { room.cardSets.push(set); for (const [token, image] of images) room.cardImages.set(token, image); }
     return result;
   }
   /** A hand's label and color always come from the participant list, never from the client. */
