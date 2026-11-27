@@ -17,6 +17,16 @@ If the owner leaves, their hand stays on the board (*(away)*) and remains hidden
 
 Privacy is enforced by the server, not just drawn: each participant receives their own snapshot, and the faces of cards in someone else's hand — as well as face-down cards and the order of every deck — are never sent to their browser. See `server/visibility.ts` and `server/permissions.ts`.
 
+## Imported card decks (Naipe)
+
+Card decks made in [Naipe](https://luccoelho.github.io/TCC/) can be brought to the board: open **Things** and tap **Import deck** (under *Tabletop*), then pick the `.json` file Naipe exports (there is a sample in `example/`). A face-down deck with all the cards appears, with the first card on top; it shuffles, deals, stacks and goes into hands like the regular deck.
+
+Cards keep the proportions of the Naipe blueprint and show their fields in order: the first text as the title, then the art area, longer texts, and short values (e.g. *Custo 3 · Poder 2/4*) at the bottom. Images and icons are placeholders for now, because the export does not carry the image files.
+
+## Decks from images
+
+Any pictures can become a deck: open **Things** and tap **Deck from images**, then pick one or more image files. Each image becomes one card, in file-name order (*card 2* comes before *card 10*), with the first one on top of a face-down deck. Cards take the shape of the first image; the others are fitted inside it without cropping. Up to 60 images at a time; the browser shrinks them before sending. To try it, pick the fraction cards in `example/imagens/`.
+
 ## Run locally
 
 Requires Node.js 20 or newer.

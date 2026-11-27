@@ -24,5 +24,8 @@
 - [ ] Add a thing: cartesian plane
 - [ ] Add a thing: number cards (square, stackable)
 
-- [ ] Import card decks from Naipe (https://luccoelho.github.io/TCC/) JSON exports. Waiting for a real export sample (docs/naipe-exemplo.json) before writing the parser.
+- [X] Make a deck from image files, one card per image (see D-009 in VISAO_E_DECISOES.md).
+- [X] Import card decks from Naipe (https://luccoelho.github.io/TCC/) JSON exports (see D-008 in VISAO_E_DECISOES.md; sample in `example/`).
+- [ ] Naipe import: bring card images along. The export only has `image_path` (null in the sample); we need an export that embeds the files (or a zip) to show them.
+- [ ] Naipe import: draw `icone` fields with their Material Symbols glyph (they show as ✦ for now), and use Naipe's card layout if a future export includes it.
 - [ ] Card images are not yet supported; the snapshot still carries pasted images inline (data URLs), which is costly since the whole snapshot is resent on each change.

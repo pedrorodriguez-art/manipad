@@ -14,6 +14,11 @@ app.use(express.json());
 app.get('/api/health', (_req, res) => res.json({ ok: true, rooms: store.rooms.size }));
 app.post('/api/rooms', (_req, res) => { const room = store.create(); res.status(201).json({ roomId: room.id, tutorToken: room.tutorToken }); });
 app.get('/api/rooms/:id', (req, res) => res.json({ exists: Boolean(store.get(req.params.id)) }));
+// Card images never change once imported (each has its own random token), so browsers may cache them for good.
+app.get('/api/rooms/:id/card-images/:token', (req, res) => {
+  const image = store.get(req.params.id)?.cardImages.get(req.params.token); if (!image) return res.sendStatus(404);
+  res.set({ 'Content-Type': image.type, 'Cache-Control': 'private, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' }).send(image.data);
+});
 
 io.use((socket, next) => {
   const parsed = joinSchema.safeParse(socket.handshake.auth);

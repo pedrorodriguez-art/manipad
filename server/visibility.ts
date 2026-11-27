@@ -1,13 +1,15 @@
 import type { BoardObject, CardObject, DeckObject } from '../src/shared/types.js';
 import { handOf } from '../src/shared/regions.js';
+import { hiddenCode } from '../src/shared/cards.js';
 
 /**
  * Builds the board as one participant is allowed to see it. Hidden information is removed, not just flagged,
  * because everything sent here is readable in the browser's devtools.
  *
- * - Face-down cards: rank/suit are blanked for everyone…
+ * - Face-down cards: rank/suit are blanked for everyone (an imported card keeps only its set, `s1:`, so its size and back
+ *   can be drawn)…
  * - …except cards in the viewer's own hand, which keep their face and get `peek: true`.
- * - Decks: the order is never sent (codes are blanked) except the top card of a face-up deck outside any hand.
+ * - Decks: the order is never sent (codes are blanked, imported ones down to their set) except the top card of a face-up deck outside any hand.
  *   `initialCards` is never sent, since merging face-down cards into a deck appends their codes to it.
  */
 export function projectObjects(objects: BoardObject[], viewerId: string): BoardObject[] {
@@ -24,11 +26,13 @@ function projectCard(objects: BoardObject[], card: CardObject, viewerId: string)
   const hand = handOf(objects, card);
   if (hand && hand.ownerId === viewerId) return { ...card, faceUp: false, peek: true };
   if (card.faceUp && !hand) return { ...card };
-  return { ...card, ...HIDDEN_CARD, faceUp: false };
+  const hidden: CardObject = { ...card, ...HIDDEN_CARD, faceUp: false };
+  if (card.face) hidden.face = hiddenCode(card.face); else delete hidden.face;
+  return hidden;
 }
 
 function projectDeck(objects: BoardObject[], deck: DeckObject): DeckObject {
   const showTop = deck.faceUp && !handOf(objects, deck);
-  const cards = deck.cards.map((code, i) => showTop && i === deck.cards.length - 1 ? code : '');
+  const cards = deck.cards.map((code, i) => showTop && i === deck.cards.length - 1 ? code : hiddenCode(code));
   return { ...deck, cards, initialCards: [] };
 }

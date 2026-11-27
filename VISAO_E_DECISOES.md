@@ -122,3 +122,19 @@ Esta seção separa a motivação original das escolhas observadas na implementa
 **Razão:** sem isso, bastaria copiar o id de outra pessoa para receber o snapshot dela e ver a sua mão.
 
 **Consequência:** a mesma pessoa em outro navegador entra como outro participante. O segredo vive só na memória da sala, que é temporária (D-003).
+
+### D-008 — Baralhos importados do Naipe como catálogo da sala
+
+**Decisão atual:** o arquivo exportado pelo Naipe é lido no navegador (`src/shared/naipe.ts`) e enviado ao servidor num comando `importDeck`. O servidor registra as faces num catálogo da sala (`cardSets`, até 10 conjuntos de até 200 cartas) e cria um monte virado para baixo com a primeira carta no topo. Montes e cartas continuam guardando só códigos: `s1:0` aponta para a face 0 do conjunto `s1`. Uma carta oculta chega aos outros como `s1:` — com o conjunto (para desenhar o tamanho e o verso), sem o índice.
+
+**Razão:** manter as regras de privacidade de D-006 sem tratar cartas importadas como caso à parte: o catálogo é público (como saber o que há num baralho comum) e só cresce, então colocar uma carta oculta num monte, desfazer ou limpar o quadro nunca muda o que é enviado. A importação é um `create` comum, que pode ser desfeito.
+
+**Consequência:** o export do Naipe não traz layout nem os arquivos das imagens, então a carta é montada de forma genérica (título, área da arte, textos, valores curtos com o nome do campo) e imagens e ícones aparecem como marcadores. O catálogo vai inteiro em cada snapshot; se os conjuntos crescerem (por exemplo, com imagens), convém enviá-lo à parte.
+
+### D-009 — Baralhos feitos de imagens, com as imagens servidas à parte
+
+**Decisão atual:** além do Naipe, o participante pode escolher arquivos de imagem e criar um baralho com uma carta por imagem (`src/imageDeck.ts`). O navegador ordena os arquivos pelo nome, reduz cada imagem ao tamanho da carta (formato da primeira imagem, as demais ajustadas sem corte) e as envia como JPEG no mesmo comando `importDeck` de D-008, numa face com o campo `image`. O servidor guarda os bytes e troca cada imagem por uma URL própria (`/api/rooms/<sala>/card-images/<token aleatório>`), que o navegador guarda em cache.
+
+**Razão:** reaproveitar o catálogo de D-008 (privacidade, desfazer, monte e mão funcionam igual) sem colocar imagens no snapshot, que é reenviado a cada mudança. As faces continuam públicas, como as do Naipe.
+
+**Consequência:** até 60 imagens por baralho e 30 MB de imagens por sala; só PNG, JPEG e WebP em data URL são aceitos (nada de SVG ou links externos). As imagens vivem na memória da sala, como o resto (D-003).
