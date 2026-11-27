@@ -1,5 +1,6 @@
 import type { BoardCommand, BoardObject, CardObject, DeckObject } from './types.js';
 import { handOf, isPrivatizable, regionAt } from './regions.js';
+import { cardFromCode, codeOfCard, isCustomCode } from './cards.js';
 
 /** Fields a generic `update` may change on cards, decks and hands. Faces, deck contents and owners only change through dedicated commands. */
 const GEOMETRY_KEYS = new Set(['x', 'y', 'rotation', 'scaleX', 'scaleY', 'width', 'height', 'locked']);
@@ -74,14 +75,16 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
   else if (command.type === 'drawCard' || command.type === 'drawAndFlip') {
     const deck = next.objects.find((o) => o.id === command.id && o.type === 'deck');
     if (deck?.type === 'deck' && deck.cards.length) {
-      const code = deck.cards[deck.cards.length - 1]; const suits = ['♠','♥','♦','♣'] as const;
+      const code = deck.cards[deck.cards.length - 1];
       const drawnCount = next.objects.filter((o) => o.type === 'card' && o.creator === `deck:${deck.id}`).length;
-      const landing = command.type === 'drawCard' && command.position ? command.position : { x: deck.x + 86 + (drawnCount % 4) * 82, y: deck.y + Math.floor(drawnCount / 4) * 106 };
+      // Imported cards are bigger than playing cards (see cardSize in cards.ts), so they are dealt further apart.
+      const step = isCustomCode(code) ? { x: 124, y: 162 } : { x: 82, y: 106 };
+      const landing = command.type === 'drawCard' && command.position ? command.position : { x: deck.x + step.x + 4 + (drawnCount % 4) * step.x, y: deck.y + Math.floor(drawnCount / 4) * step.y };
       next.objects = next.objects.map((o) => {
         if (o.id === deck.id && o.type === 'deck') return { ...o, cards: o.cards.slice(0, -1), revision: next.revision };
         return o;
       });
-      next.objects.push({ id: `card-${crypto.randomUUID()}`, type: 'card', x: landing.x, y: landing.y, rotation: 0, scaleX: 1, scaleY: 1, z: next.objects.length, locked: false, creator: `deck:${deck.id}`, revision: next.revision, rank: code.slice(0,-1), suit: suits[Number(code.slice(-1))] ?? '♠', faceUp: command.type === 'drawAndFlip' ? true : deck.faceUp });
+      next.objects.push({ id: `card-${crypto.randomUUID()}`, type: 'card', x: landing.x, y: landing.y, rotation: 0, scaleX: 1, scaleY: 1, z: next.objects.length, locked: false, creator: `deck:${deck.id}`, revision: next.revision, ...cardFromCode(code), faceUp: command.type === 'drawAndFlip' ? true : deck.faceUp });
     }
   }
   next.objects = normalizeHands(state.objects, normalizeDecks(next.objects, next.revision), next.revision);
@@ -89,15 +92,14 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
 }
 
 function isCardOrDeck(object: BoardObject): object is CardObject | DeckObject { return object.type === 'card' || object.type === 'deck'; }
-function cardCode(card: CardObject) { const suits = ['♠','♥','♦','♣'] as const; return `${card.rank}${suits.indexOf(card.suit)}`; }
+const cardCode = codeOfCard;
 function normalizeDecks(objects: BoardObject[], revision: number): BoardObject[] {
-  const suits = ['♠','♥','♦','♣'] as const;
   return objects.flatMap((object): BoardObject[] => {
     if (object.type !== 'deck') return [object];
     if (object.cards.length === 0) return [];
     if (object.cards.length > 1) return [object];
     const code = object.cards[0];
-    return [{ id: object.id, type: 'card', x: object.x, y: object.y, rotation: object.rotation, scaleX: object.scaleX, scaleY: object.scaleY, z: object.z, locked: object.locked, creator: object.creator, revision, rank: code.slice(0, -1), suit: suits[Number(code.slice(-1))] ?? '♠', faceUp: object.faceUp, ...(object.handId ? { handId: object.handId } : {}) }];
+    return [{ id: object.id, type: 'card', x: object.x, y: object.y, rotation: object.rotation, scaleX: object.scaleX, scaleY: object.scaleY, z: object.z, locked: object.locked, creator: object.creator, revision, ...cardFromCode(code), faceUp: object.faceUp, ...(object.handId ? { handId: object.handId } : {}) }];
   });
 }
 

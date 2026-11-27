@@ -1,0 +1,133 @@
+{
+  "collection": "Set de demonstração",
+  "blueprint": {
+    "name": "Carta padrão 63×88",
+    "width_mm": 63,
+    "height_mm": 88
+  },
+  "cards": [
+    {
+      "id": "9830dc91-5429-43f2-8a9c-b5dd99196a90",
+      "sort_order": 0,
+      "fields": {
+        "Nome": {
+          "type": "texto",
+          "text": "Guardiã da Bruma",
+          "image_path": null
+        },
+        "Símbolo": {
+          "type": "icone",
+          "text": "auto_awesome",
+          "image_path": null
+        },
+        "Arte": {
+          "type": "imagem",
+          "text": null,
+          "image_path": null
+        },
+        "Custo": {
+          "type": "texto",
+          "text": "3",
+          "image_path": null
+        },
+        "Tipo": {
+          "type": "texto",
+          "text": "Criatura — Espírito",
+          "image_path": null
+        },
+        "Texto": {
+          "type": "texto",
+          "text": "Quando entrar, olhe as duas primeiras cartas do seu grimório.",
+          "image_path": null
+        },
+        "Poder": {
+          "type": "texto",
+          "text": "2/4",
+          "image_path": null
+        }
+      }
+    },
+    {
+      "id": "3ca961ae-ddcf-479a-af5a-841d72927490",
+      "sort_order": 1,
+      "fields": {
+        "Nome": {
+          "type": "texto",
+          "text": "Farol Submerso",
+          "image_path": null
+        },
+        "Símbolo": {
+          "type": "icone",
+          "text": "auto_awesome",
+          "image_path": null
+        },
+        "Arte": {
+          "type": "imagem",
+          "text": null,
+          "image_path": null
+        },
+        "Custo": {
+          "type": "texto",
+          "text": "2",
+          "image_path": null
+        },
+        "Tipo": {
+          "type": "texto",
+          "text": "Artefato — Local",
+          "image_path": null
+        },
+        "Texto": {
+          "type": "texto",
+          "text": "No início do seu turno, ganhe 1 de névoa.",
+          "image_path": null
+        },
+        "Poder": {
+          "type": "texto",
+          "text": "",
+          "image_path": null
+        }
+      }
+    },
+    {
+      "id": "874090cf-4306-49a8-a04f-b29db2aa162a",
+      "sort_order": 2,
+      "fields": {
+        "Nome": {
+          "type": "texto",
+          "text": "Corvo de Cinzas",
+          "image_path": null
+        },
+        "Símbolo": {
+          "type": "icone",
+          "text": "auto_awesome",
+          "image_path": null
+        },
+        "Arte": {
+          "type": "imagem",
+          "text": null,
+          "image_path": null
+        },
+        "Custo": {
+          "type": "texto",
+          "text": "1",
+          "image_path": null
+        },
+        "Tipo": {
+          "type": "texto",
+          "text": "Criatura — Ave",
+          "image_path": null
+        },
+        "Texto": {
+          "type": "texto",
+          "text": "Voar. Quando atacar, descarte uma carta e compre uma.",
+          "image_path": null
+        },
+        "Poder": {
+          "type": "texto",
+          "text": "1/1",
+          "image_path": null
+        }
+      }
+    }
+  ]
+}

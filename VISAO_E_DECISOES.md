@@ -122,3 +122,11 @@ Esta seção separa a motivação original das escolhas observadas na implementa
 **Razão:** sem isso, bastaria copiar o id de outra pessoa para receber o snapshot dela e ver a sua mão.
 
 **Consequência:** a mesma pessoa em outro navegador entra como outro participante. O segredo vive só na memória da sala, que é temporária (D-003).
+
+### D-008 — Baralhos importados do Naipe como catálogo da sala
+
+**Decisão atual:** o arquivo exportado pelo Naipe é lido no navegador (`src/shared/naipe.ts`) e enviado ao servidor num comando `importDeck`. O servidor registra as faces num catálogo da sala (`cardSets`, até 10 conjuntos de até 200 cartas) e cria um monte virado para baixo com a primeira carta no topo. Montes e cartas continuam guardando só códigos: `s1:0` aponta para a face 0 do conjunto `s1`. Uma carta oculta chega aos outros como `s1:` — com o conjunto (para desenhar o tamanho e o verso), sem o índice.
+
+**Razão:** manter as regras de privacidade de D-006 sem tratar cartas importadas como caso à parte: o catálogo é público (como saber o que há num baralho comum) e só cresce, então colocar uma carta oculta num monte, desfazer ou limpar o quadro nunca muda o que é enviado. A importação é um `create` comum, que pode ser desfeito.
+
+**Consequência:** o export do Naipe não traz layout nem os arquivos das imagens, então a carta é montada de forma genérica (título, área da arte, textos, valores curtos com o nome do campo) e imagens e ícones aparecem como marcadores. O catálogo vai inteiro em cada snapshot; se os conjuntos crescerem (por exemplo, com imagens), convém enviá-lo à parte.

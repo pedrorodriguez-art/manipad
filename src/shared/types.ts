@@ -17,8 +17,9 @@ export interface FractionBarObject extends BaseObject { type: 'fractionBar'; par
 /**
  * `handId`: the hand (region) the card was placed in; set only by the server when the card is moved/drawn into a region.
  * `peek`: never stored; the server sets it only in the snapshot sent to the owner of that hand.
+ * `face`: set for cards from an imported set (see `shared/cards.ts`): `${setId}:${index}`, or just `${setId}:` when hidden. `rank` is then empty.
  */
-export interface CardObject extends BaseObject { type: 'card'; rank: string; suit: '♠' | '♥' | '♦' | '♣'; faceUp: boolean; handId?: string; peek?: boolean; }
+export interface CardObject extends BaseObject { type: 'card'; rank: string; suit: '♠' | '♥' | '♦' | '♣'; faceUp: boolean; face?: string; handId?: string; peek?: boolean; }
 export interface DeckObject extends BaseObject { type: 'deck'; cards: string[]; initialCards: string[]; faceUp: boolean; handId?: string; }
 export interface DieObject extends BaseObject { type: 'die'; value: number; color: string; rollNonce: number; }
 export interface PawnObject extends BaseObject { type: 'pawn'; color: string; label?: string; }
@@ -28,8 +29,14 @@ export interface ImageObject extends BaseObject { type: 'image'; src: string; wi
 export interface RegionObject extends BaseObject { type: 'region'; width: number; height: number; ownerId: string; ownerName: string; color: string; }
 export type BoardObject = StrokeObject | TextObject | ShapeObject | CounterObject | NumberTileObject | FractionBarObject | CardObject | DeckObject | DieObject | PawnObject | ChipObject | ImageObject | RegionObject;
 
+/** One field of an imported card face, in the order the source defines them. */
+export interface CardField { name: string; kind: 'text' | 'icon' | 'image'; text: string; }
+export interface CardFace { fields: CardField[]; }
+/** An imported collection of card faces (e.g. from Naipe). Room-wide and append-only; cards and decks refer to faces by code. */
+export interface CardSet { id: string; name: string; widthMm: number; heightMm: number; faces: CardFace[]; }
+
 export interface Participant { id: string; name: string; color: string; isTutor: boolean; cursor?: { x: number; y: number }; selection: string[]; }
-export interface RoomSnapshot { version: 1; roomId: string; objects: BoardObject[]; participants: Participant[]; locked: boolean; revision: number; }
+export interface RoomSnapshot { version: 1; roomId: string; objects: BoardObject[]; participants: Participant[]; locked: boolean; revision: number; cardSets: CardSet[]; }
 
 export type BoardCommand =
   | { type: 'create'; object: BoardObject }
@@ -45,7 +52,9 @@ export type BoardCommand =
   | { type: 'mergeIntoDeck'; sourceId: string; targetId: string }
   | { type: 'flipCard'; id: string }
   | { type: 'flipChip'; id: string }
-  | { type: 'assignRegion'; id: string; ownerId: string; ownerName?: string; color?: string };
+  | { type: 'assignRegion'; id: string; ownerId: string; ownerName?: string; color?: string }
+  /** Registers a card set in the room and places a face-down deck with all its cards (handled by the room store). */
+  | { type: 'importDeck'; id: string; position: { x: number; y: number }; set: Omit<CardSet, 'id'> };
 
 export interface ServerToClientEvents {
   snapshot: (snapshot: RoomSnapshot) => void;
