@@ -38,3 +38,22 @@ test('makes a deck from image files, one card per image, first file on top', asy
   await page.waitForTimeout(300);
   await page.screenshot({ path: testInfo.outputPath('image-deck.png') });
 });
+
+test('shows progress while a deck is made from many images', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'one browser is enough');
+  await page.goto('/'); await page.getByRole('button', { name: /Start a new room/i }).click(); await page.waitForURL(/\/room\//);
+  await page.getByLabel('Your name').fill('Maya'); await page.getByRole('button', { name: /Enter room/i }).click();
+  await expect(page.getByText('Live')).toBeVisible();
+  const files = Array.from({ length: 30 }, (_, i) => ({ name: `card ${i + 1}.png`, mimeType: 'image/png', buffer: solidPng(900, 1300, [i * 8, 120, 200]) }));
+  // Record every state the indicator goes through, so a fast machine cannot slip past it.
+  await page.evaluate(() => { const seen: string[] = ((window as any).__uploadSeen = []); new MutationObserver(() => { const el = document.querySelector('.upload-progress'); const button = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Deck from images')) as HTMLButtonElement | undefined; const entry = el ? `${el.textContent}|${button?.disabled}` : 'hidden'; if (seen.at(-1) !== entry) seen.push(entry); }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
+  await page.getByLabel('Make deck from images').setInputFiles(files);
+  await expect(page.locator('.mini-grid i[data-type="deck"]')).toHaveAttribute('data-count', '30', { timeout: 20_000 });
+  await expect(page.locator('.upload-progress')).toBeHidden();
+  await expect(page.getByRole('button', { name: /Deck from images/ })).toBeEnabled();
+  const seen: string[] = await page.evaluate(() => (window as any).__uploadSeen);
+  expect(seen).toContain('Preparing images… 0 of 30|true');
+  expect(seen).toContain('Preparing images… 15 of 30|true');
+  expect(seen).toContain('Uploading 30 cards…|true');
+  expect(seen.at(-1)).toBe('hidden');
+});

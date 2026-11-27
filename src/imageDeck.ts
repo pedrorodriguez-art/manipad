@@ -27,23 +27,33 @@ export function imageDeckName(files: { name: string }[]) {
   return name.slice(0, CARD_SET_LIMITS.name);
 }
 
-export async function buildImageDeck(picked: File[]): Promise<ImageDeckImport> {
+/** `onProgress(done, total)` is called after each image is read and resized, so a large batch can show its progress. */
+export async function buildImageDeck(picked: File[], onProgress?: (done: number, total: number) => void): Promise<ImageDeckImport> {
   const images = orderImageFiles(picked.filter((file) => file.type.startsWith('image/')));
   if (!images.length) throw new Error('Pick one or more image files');
   if (images.length > IMAGE_DECK_LIMITS.files) throw new Error(`A deck can have at most ${IMAGE_DECK_LIMITS.files} images (you picked ${images.length})`);
   const warnings: string[] = [];
   const skippedOther = picked.length - images.length;
-  const loaded: { file: File; image: HTMLImageElement }[] = []; let unreadable = 0;
-  for (const file of images) { try { loaded.push({ file, image: await loadImage(file) }); } catch { unreadable++; } }
-  if (!loaded.length) throw new Error('Could not read those images');
+  const faces: CardSet['faces'] = [], used: File[] = []; let unreadable = 0, ratio = 1, width = 0, height = 0;
+  onProgress?.(0, images.length);
+  for (const [index, file] of images.entries()) {
+    let image: HTMLImageElement | undefined;
+    try { image = await loadImage(file); } catch { unreadable++; }
+    if (image) {
+      // The first readable image sets the shape of every card.
+      if (!width) { ratio = Math.min(2, Math.max(0.4, image.naturalWidth / image.naturalHeight)); height = CUSTOM_CARD_HEIGHT * RESOLUTION; width = Math.round(height * ratio); }
+      faces.push({ fields: [{ name: 'File', kind: 'text', text: imageCardName(file.name) }], image: render(image, width, height) }); used.push(file);
+    }
+    onProgress?.(index + 1, images.length);
+    await nextFrame(); // let the page repaint the progress before the next image
+  }
+  if (!faces.length) throw new Error('Could not read those images');
   if (unreadable + skippedOther) warnings.push(`${unreadable + skippedOther} file${unreadable + skippedOther === 1 ? ' was' : 's were'} skipped (not a readable image)`);
-
-  const first = loaded[0].image, ratio = Math.min(2, Math.max(0.4, first.naturalWidth / first.naturalHeight));
-  const height = CUSTOM_CARD_HEIGHT * RESOLUTION, width = Math.round(height * ratio);
-  const faces = loaded.map(({ file, image }) => ({ fields: [{ name: 'File', kind: 'text' as const, text: imageCardName(file.name) }], image: render(image, width, height) }));
-  if (faces.reduce((sum, face) => sum + face.image.length, 0) > IMAGE_DECK_LIMITS.totalChars) throw new Error('Those images are too large together; try fewer at a time');
-  return { set: { name: imageDeckName(loaded.map((l) => l.file)), widthMm: Math.round(88 * ratio * 10) / 10, heightMm: 88, faces }, warnings };
+  if (faces.reduce((sum, face) => sum + (face.image?.length ?? 0), 0) > IMAGE_DECK_LIMITS.totalChars) throw new Error('Those images are too large together; try fewer at a time');
+  return { set: { name: imageDeckName(used), widthMm: Math.round(88 * ratio * 10) / 10, heightMm: 88, faces }, warnings };
 }
+
+const nextFrame = () => new Promise<void>((resolve) => { if (typeof requestAnimationFrame === 'function' && !document.hidden) requestAnimationFrame(() => resolve()); else setTimeout(resolve, 0); });
 
 function loadImage(file: File) {
   const source = URL.createObjectURL(file);
