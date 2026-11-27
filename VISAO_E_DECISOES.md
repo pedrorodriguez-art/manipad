@@ -146,3 +146,24 @@ Esta seção separa a motivação original das escolhas observadas na implementa
 **Razão:** todos precisam ver o mesmo resultado, e ninguém pode escolher o valor pelo navegador. Antes, um `update` com `value` mudava a face de qualquer dado. Reaproveitar o depósito de imagens evita reenviar as imagens a cada mudança da mesa.
 
 **Consequência:** desfazer uma rolagem volta ao valor anterior. Isso não permite escolher o resultado, só retornar a um valor que já saiu, e uma nova rolagem é sempre sorteada de novo. As imagens dos dados contam no limite de 30 MB por sala. O gesto de rolar (toque duplo, o padrão, ou toque simples) é uma preferência de cada pessoa, guardada no navegador.
+
+### D-012 — Animações só no cliente, cortadas quando travariam
+
+**Decisão atual:** as animações saem da comparação entre o snapshot anterior e o novo (`src/animationPlan.ts`), depois que a mesa já foi desenhada no estado novo. Os nós do Konva que mudaram são animados até onde o React já os colocou (`src/boardAnimations.ts`):
+- carta comprada ou distribuída: sai do monte;
+- carta ou monte virado: abre a partir da borda;
+- monte embaralhado: chacoalha;
+- dado rolado: balança e passa por algumas faces;
+- objeto movido por outra pessoa, ou por desfazer: desliza até o lugar novo.
+
+Durações de 150 a 300 ms. Para que os outros jogadores percebam um embaralhamento (eles nunca veem a ordem), o monte ganhou um contador, `shuffleNonce`, como o `rollNonce` do dado.
+
+Nada anima:
+- no primeiro snapshot;
+- com `prefers-reduced-motion`;
+- quando mais de 30 coisas mudam de uma vez;
+- quando o redesenho da mesa custa mais que 10 ms naquele aparelho. A medida vem dos próprios redesenhos do Konva, não do número de objetos.
+
+**Razão:** o estado sincronizado continua sendo a única verdade. A animação nunca atrasa um toque nem muda o que o servidor guarda, e termina exatamente no estado recebido. Cada quadro de animação redesenha a camada inteira: numa mesa cheia, num aparelho lento, a animação rodaria a poucos quadros por segundo (no perfil tablet, com 150 cartas, um embaralhamento teve 7 quadros em cerca de 1 s). Pelo critério "se travar, corta", nesses casos a mudança só aparece.
+
+**Consequência:** os testes e2e rodam com `reducedMotion: 'reduce'` (em `playwright.config.ts`), então nada do que eles clicam está em movimento. Os testes de animação ligam o movimento de volta. O teste de desempenho (`tests/e2e/animation-performance.spec.ts`) mede os quadros no perfil tablet, com e sem animação, e verifica que, se uma animação roda na mesa cheia, a mediana dos quadros fica em até 34 ms. A medição mostrou que o custo maior hoje não é a animação: com 150 cartas, cada mudança recebida redesenha a mesa inteira (p95 de 120 a 150 ms por quadro no perfil tablet), e as sombras com desfoque dos objetos custam centenas de ms por redesenho no Chromium headless, que desenha o canvas sem GPU.

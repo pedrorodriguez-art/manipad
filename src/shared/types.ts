@@ -20,7 +20,8 @@ export interface FractionBarObject extends BaseObject { type: 'fractionBar'; par
  * `face`: set for cards from an imported set (see `shared/cards.ts`): `${setId}:${index}`, or just `${setId}:` when hidden. `rank` is then empty.
  */
 export interface CardObject extends BaseObject { type: 'card'; rank: string; suit: '♠' | '♥' | '♦' | '♣'; faceUp: boolean; face?: string; handId?: string; peek?: boolean; }
-export interface DeckObject extends BaseObject { type: 'deck'; cards: string[]; initialCards: string[]; faceUp: boolean; handId?: string; }
+/** `shuffleNonce` grows on every shuffle, so players (who never see the order) can tell a shuffle happened and animate it. */
+export interface DeckObject extends BaseObject { type: 'deck'; cards: string[]; initialCards: string[]; faceUp: boolean; handId?: string; shuffleNonce?: number; }
 /**
  * `value` is the face showing (1..sides), always rolled by the server; `rollNonce` grows on every roll so clients can animate it.
  * `sides` defaults to 6. `faces`, when set, has one entry per side; an `image` is a URL served by the room (see D-010).

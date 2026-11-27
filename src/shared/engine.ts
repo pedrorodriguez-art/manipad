@@ -65,7 +65,7 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
   else if (command.type === 'shuffleDeck') next.objects = next.objects.map((o) => {
     if (o.id !== command.id || o.type !== 'deck') return o;
     const cards = [...o.cards]; for (let i = cards.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cards[i], cards[j]] = [cards[j], cards[i]]; }
-    return { ...o, cards, revision: next.revision };
+    return { ...o, cards, shuffleNonce: (o.shuffleNonce ?? 0) + 1, revision: next.revision };
   });
   else if (command.type === 'resetDeck') next.objects = next.objects.filter((o) => o.type !== 'card' || o.creator !== `deck:${command.id}`).map((o) => o.id === command.id && o.type === 'deck' ? { ...o, cards: [...o.initialCards], faceUp: false, revision: next.revision } : o);
   else if (command.type === 'mergeIntoDeck') {
