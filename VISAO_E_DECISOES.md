@@ -138,3 +138,11 @@ Esta seção separa a motivação original das escolhas observadas na implementa
 **Razão:** reaproveitar o catálogo de D-008 (privacidade, desfazer, monte e mão funcionam igual) sem colocar imagens no snapshot, que é reenviado a cada mudança. As faces continuam públicas, como as do Naipe.
 
 **Consequência:** até 60 imagens por baralho e 30 MB de imagens por sala; só PNG, JPEG e WebP em data URL são aceitos (nada de SVG ou links externos). As imagens vivem na memória da sala, como o resto (D-003).
+
+### D-010 — Dados customizados, sorteados só no servidor
+
+**Decisão atual:** o dado da mesa ganhou de 2 a 20 faces (`sides`, padrão 6) e, opcionalmente, um conteúdo por face (`faces`): um texto curto ou uma imagem. O valor é sempre sorteado no servidor, ao rolar (`rollDie`, ou `rollDice` para vários dados num passo só) e também ao criar ou duplicar um dado. O `update` genérico não altera `value`, `rollNonce`, `sides` nem `faces`; as faces só mudam pelo comando `editDie`. As imagens das faces seguem o caminho das cartas de imagem (D-009): o navegador as reduz, o servidor guarda os bytes e o snapshot leva só a URL. Um dado copiado ou editado só pode apontar para imagens que a sala já tem.
+
+**Razão:** todos precisam ver o mesmo resultado, e ninguém pode escolher o valor pelo navegador. Antes, um `update` com `value` mudava a face de qualquer dado. Reaproveitar o depósito de imagens evita reenviar as imagens a cada mudança da mesa.
+
+**Consequência:** desfazer uma rolagem volta ao valor anterior. Isso não permite escolher o resultado, só retornar a um valor que já saiu, e uma nova rolagem é sempre sorteada de novo. As imagens dos dados contam no limite de 30 MB por sala. O gesto de rolar (toque duplo, o padrão, ou toque simples) é uma preferência de cada pessoa, guardada no navegador.

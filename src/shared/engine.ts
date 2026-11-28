@@ -1,9 +1,12 @@
 import type { BoardCommand, BoardObject, CardObject, DeckObject } from './types.js';
 import { handOf, isPrivatizable, regionAt } from './regions.js';
 import { cardFromCode, codeOfCard, isCustomCode } from './cards.js';
+import { dieSides, rollFace } from './dice.js';
 
 /** Fields a generic `update` may change on cards, decks and hands. Faces, deck contents and owners only change through dedicated commands. */
 const GEOMETRY_KEYS = new Set(['x', 'y', 'rotation', 'scaleX', 'scaleY', 'width', 'height', 'locked']);
+/** Only the server decides what a die shows: a generic `update` cannot set these (faces change through `editDie`). */
+const DIE_KEYS = ['value', 'rollNonce', 'sides', 'faces'];
 
 export interface BoardState { objects: BoardObject[]; revision: number; }
 const clone = <T>(value: T): T => structuredClone(value);
@@ -16,12 +19,14 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
     if (created.type === 'card') delete created.peek;
     if (created.type === 'card' || created.type === 'deck') delete created.handId;
     if (created.type === 'region') created.rotation = 0;
+    if (created.type === 'die') created.value = rollFace(created); // a new (or duplicated) die never shows a value the client chose
     next.objects.push(created);
   } else if (command.type === 'update') {
     const safePatch = { ...command.patch } as Record<string, unknown>;
     for (const key of ['id','type','creator','revision']) delete safePatch[key];
     const restricted = (item: BoardObject) => isPrivatizable(item) || item.type === 'region';
-    const patchFor = (item: BoardObject) => restricted(item) ? Object.fromEntries(Object.entries(safePatch).filter(([key]) => GEOMETRY_KEYS.has(key) && (item.type === 'region' ? key !== 'rotation' : key !== 'width' && key !== 'height'))) : safePatch;
+    const patchFor = (item: BoardObject) => restricted(item) ? Object.fromEntries(Object.entries(safePatch).filter(([key]) => GEOMETRY_KEYS.has(key) && (item.type === 'region' ? key !== 'rotation' : key !== 'width' && key !== 'height')))
+      : item.type === 'die' ? Object.fromEntries(Object.entries(safePatch).filter(([key]) => !DIE_KEYS.includes(key))) : safePatch;
     // Moving a hand carries the cards in it (the ones not being moved explicitly by this same command).
     const carried = new Map<string, { dx: number; dy: number }>();
     for (const region of next.objects) {
@@ -42,7 +47,17 @@ export function applyCommand(state: BoardState, command: BoardCommand, actor: st
     const picked = next.objects.filter((o) => command.ids.includes(o.id));
     const rest = next.objects.filter((o) => !command.ids.includes(o.id));
     next.objects = (command.direction === 'front' ? [...rest, ...picked] : [...picked, ...rest]).map((o, z) => ({ ...o, z, revision: next.revision }));
-  } else if (command.type === 'rollDie') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'die' ? { ...o, value: 1 + Math.floor(Math.random() * 6), rollNonce: o.rollNonce + 1, revision: next.revision } : o);
+  } else if (command.type === 'rollDie' || command.type === 'rollDice') {
+    const ids = command.type === 'rollDie' ? [command.id] : command.ids;
+    next.objects = next.objects.map((o) => ids.includes(o.id) && o.type === 'die' ? { ...o, value: rollFace(o), rollNonce: o.rollNonce + 1, revision: next.revision } : o);
+  } else if (command.type === 'editDie') next.objects = next.objects.map((o) => {
+    if (o.id !== command.id || o.type !== 'die' || o.locked) return o;
+    const edited = { ...o, sides: command.sides, color: command.color, revision: next.revision };
+    if (command.faces?.length) edited.faces = command.faces; else delete edited.faces;
+    // Keep the face showing when it still exists; otherwise the server picks one.
+    if (edited.value > dieSides(edited)) edited.value = rollFace(edited);
+    return edited;
+  });
   else if (command.type === 'flipCard') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'card' ? { ...o, faceUp: !o.faceUp, revision: next.revision } : o);
   else if (command.type === 'flipDeck') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'deck' ? { ...o, cards: [...o.cards].reverse(), faceUp: !o.faceUp, revision: next.revision } : o);
   else if (command.type === 'assignRegion') next.objects = next.objects.map((o) => o.id === command.id && o.type === 'region' ? { ...o, ownerId: command.ownerId, ownerName: command.ownerName ?? o.ownerName, color: command.color ?? o.color, revision: next.revision } : o);

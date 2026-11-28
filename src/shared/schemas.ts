@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DIE_LIMITS } from './dice.js';
 
 const finite = z.number().finite();
 const base = z.object({
@@ -21,6 +22,17 @@ const regionFields = z.object({ width: finite.min(80).max(4000), height: finite.
 export const CARD_SET_LIMITS = { faces: 200, fields: 20, name: 60, text: 400, perRoom: 10, imageChars: 400_000, imageBytesPerRoom: 30_000_000 } as const;
 /** Card images arrive as base64 data URLs of a raster format (never SVG or a link), already downscaled by the browser. */
 export const CARD_IMAGE_DATA_URL = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+/** A picture the room already serves (a duplicated or edited die keeps its faces); the server checks it belongs to the room. */
+export const ROOM_IMAGE_URL = /^\/api\/rooms\/([a-z0-9-]{4,32})\/card-images\/([A-Za-z0-9_-]{16})$/;
+const dieFace = z.object({
+  text: z.string().max(DIE_LIMITS.text).optional(),
+  image: z.union([z.string().max(DIE_LIMITS.imageChars).regex(CARD_IMAGE_DATA_URL), z.string().regex(ROOM_IMAGE_URL)]).optional(),
+}).strict();
+const sides = z.number().int().min(DIE_LIMITS.minSides).max(DIE_LIMITS.maxSides);
+const dieFaces = z.array(dieFace).min(DIE_LIMITS.minSides).max(DIE_LIMITS.maxSides);
+const dieFields = z.object({ value: z.number().int().min(1).max(DIE_LIMITS.maxSides), color: hexColor, rollNonce: z.number().int().nonnegative(), sides: sides.optional(), faces: dieFaces.optional() })
+  .refine((die) => die.value <= (die.sides ?? 6) && (!die.faces || die.faces.length === (die.sides ?? 6)));
 export const cardSetSchema = z.object({
   name: z.string().trim().min(1).max(CARD_SET_LIMITS.name),
   widthMm: finite.min(10).max(500), heightMm: finite.min(10).max(500),
@@ -29,7 +41,7 @@ export const cardSetSchema = z.object({
 
 export const boardObjectSchema = base.superRefine((value, ctx) => {
   if (!OBJECT_TYPES.includes(value.type)) { ctx.addIssue({ code: 'custom', message: 'Unknown object type' }); return; }
-  const extra = value.type === 'card' ? cardFields : value.type === 'deck' ? deckFields : value.type === 'region' ? regionFields : undefined;
+  const extra = value.type === 'card' ? cardFields : value.type === 'deck' ? deckFields : value.type === 'region' ? regionFields : value.type === 'die' ? dieFields : undefined;
   if (extra && !extra.safeParse(value).success) ctx.addIssue({ code: 'custom', message: `Invalid ${value.type}` });
 });
 
@@ -39,7 +51,9 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('delete'), ids: z.array(z.string()).max(100) }),
   z.object({ type: z.literal('reorder'), ids: z.array(z.string()).max(100), direction: z.enum(['front','back']) }),
   z.object({ type: z.literal('clear') }), z.object({ type: z.literal('undo') }), z.object({ type: z.literal('redo') }),
-  z.object({ type: z.literal('rollDie'), id: z.string() }), z.object({ type: z.literal('shuffleDeck'), id: z.string() }),
+  z.object({ type: z.literal('rollDie'), id: z.string() }),
+  z.object({ type: z.literal('rollDice'), ids: z.array(z.string()).min(1).max(DIE_LIMITS.rollAtOnce) }),
+  z.object({ type: z.literal('editDie'), id: z.string(), sides, faces: dieFaces.optional(), color: hexColor }).refine((c) => !c.faces || c.faces.length === c.sides), z.object({ type: z.literal('shuffleDeck'), id: z.string() }),
   z.object({ type: z.literal('drawCard'), id: z.string(), position: z.object({ x: finite, y: finite }).optional() }), z.object({ type: z.literal('drawAndFlip'), id: z.string() }), z.object({ type: z.literal('resetDeck'), id: z.string() }),
   z.object({ type: z.literal('flipDeck'), id: z.string() }),
   z.object({ type: z.literal('mergeIntoDeck'), sourceId: z.string(), targetId: z.string() }),

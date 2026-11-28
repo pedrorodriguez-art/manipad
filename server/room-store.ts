@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { BoardCommand, BoardObject, CardSet, DeckObject, Participant, RoomSnapshot } from '../src/shared/types.js';
-import { CARD_IMAGE_DATA_URL, CARD_SET_LIMITS } from '../src/shared/schemas.js';
+import type { BoardCommand, BoardObject, CardSet, DeckObject, DieFace, Participant, RoomSnapshot } from '../src/shared/types.js';
+import { CARD_IMAGE_DATA_URL, CARD_SET_LIMITS, ROOM_IMAGE_URL } from '../src/shared/schemas.js';
 import { applyCommand } from '../src/shared/engine.js';
 import { authorize } from './permissions.js';
 import { projectObjects } from './visibility.js';
@@ -12,7 +12,7 @@ export interface Room {
   secrets: Map<string, Buffer>;
   /** Imported card faces. Append-only (undo and clear keep them), so putting a hidden card into a deck never changes what is sent. */
   cardSets: CardSet[];
-  /** Bytes of card images, by random token; served at `cardImageUrl(room, token)`. Kept as long as the set (append-only). */
+  /** Bytes of card and die-face images, by random token; served at `cardImageUrl(room, token)`. Append-only, like the sets (undo may bring a die back). */
   cardImages: Map<string, { type: string; data: Buffer }>;
   emptySince?: number;
 }
@@ -20,6 +20,7 @@ export interface Room {
 export const cardImageUrl = (room: Room, token: string) => `/api/rooms/${encodeURIComponent(room.id)}/card-images/${token}`;
 
 export type CommandResult = { ok: true } | { ok: false; message: string };
+type StoredImage = { type: string; data: Buffer };
 
 const wordsA = ['bright','calm','clever','happy','kind','swift','tiny','wise'];
 const wordsB = ['badger','comet','dolphin','fox','koala','otter','panda','tiger'];
@@ -60,6 +61,18 @@ export class RoomStore {
     if (denied) return { ok: false, message: denied };
     command = this.withOwnerDetails(room, command);
     if (command.type === 'importDeck') return this.importDeck(room, command, actor);
+    const dieFaces = command.type === 'editDie' ? command.faces : command.type === 'create' && command.object.type === 'die' ? command.object.faces : undefined;
+    if (dieFaces) {
+      const stored = this.storeFaceImages(room, dieFaces); if (!stored.ok) return stored;
+      const faces = stored.faces;
+      const withUrls: BoardCommand = command.type === 'editDie' ? { ...command, faces } : command.type === 'create' ? { ...command, object: { ...command.object, faces } as BoardObject } : command;
+      const result = this.apply(room, withUrls, actor);
+      if (result.ok) for (const [token, image] of stored.images) room.cardImages.set(token, image);
+      return result;
+    }
+    return this.apply(room, command, actor);
+  }
+  private apply(room: Room, command: BoardCommand, actor: string): CommandResult {
     const streamingStroke = command.type === 'update' && 'points' in command.patch;
     if (!streamingStroke) { room.history.push(structuredClone(room.objects)); if (room.history.length > 60) room.history.shift(); room.future = []; }
     const next = applyCommand({ objects: room.objects, revision: room.revision }, command, actor);
@@ -69,7 +82,7 @@ export class RoomStore {
   /** Registers the set, then places a face-down deck with its first card on top (an ordinary, undoable `create`). */
   private importDeck(room: Room, command: Extract<BoardCommand, { type: 'importDeck' }>, actor: string): CommandResult {
     if (room.cardSets.length >= CARD_SET_LIMITS.perRoom) return { ok: false, message: `A room can have at most ${CARD_SET_LIMITS.perRoom} imported decks` };
-    const images = new Map<string, { type: string; data: Buffer }>();
+    const images = new Map<string, StoredImage>();
     const faces = command.set.faces.map((face) => {
       if (!face.image) return face;
       const match = CARD_IMAGE_DATA_URL.exec(face.image); if (!match) return { fields: face.fields };
@@ -85,6 +98,24 @@ export class RoomStore {
     const result = this.command(room, { type: 'create', object: deck }, actor, true);
     if (result.ok) { room.cardSets.push(set); for (const [token, image] of images) room.cardImages.set(token, image); }
     return result;
+  }
+  /**
+   * Die faces arrive with new pictures as data URLs (kept here, replaced by their URL) or with URLs of pictures this room
+   * already has (a duplicated or edited die). Nothing is stored until the caller knows the command was accepted.
+   */
+  private storeFaceImages(room: Room, faces: DieFace[]): { ok: true; faces: DieFace[]; images: Map<string, StoredImage> } | { ok: false; message: string } {
+    const images = new Map<string, StoredImage>(); const out: DieFace[] = [];
+    for (const face of faces) {
+      if (!face.image) { out.push(face); continue; }
+      const data = CARD_IMAGE_DATA_URL.exec(face.image);
+      if (data) { const token = randomBytes(12).toString('base64url'); images.set(token, { type: data[1], data: Buffer.from(data[2], 'base64') }); out.push({ ...face, image: cardImageUrl(room, token) }); continue; }
+      const known = ROOM_IMAGE_URL.exec(face.image);
+      if (!known || known[1] !== room.id || !room.cardImages.has(known[2])) return { ok: false, message: 'That die uses a picture this room does not have' };
+      out.push(face);
+    }
+    const used = [...room.cardImages.values(), ...images.values()].reduce((sum, image) => sum + image.data.length, 0);
+    if (used > CARD_SET_LIMITS.imageBytesPerRoom) return { ok: false, message: 'This room has no space left for more images' };
+    return { ok: true, faces: out, images };
   }
   /** A hand's label and color always come from the participant list, never from the client. */
   private withOwnerDetails(room: Room, command: BoardCommand): BoardCommand {
