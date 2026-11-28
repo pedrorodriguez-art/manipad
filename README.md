@@ -36,6 +36,12 @@ Tap **Die** under *Tabletop* for a classic six-sided die, or **Custom die** for 
 - **Editing:** select a die and tap **Edit die**. Dice move, duplicate and delete like any other thing.
 - Face pictures are shrunk by the browser and kept by the server, which sends only their address, like the pictures of image decks.
 
+## Animations
+
+Short animations (150–300 ms) make other people's moves easy to follow: a card drawn from a deck flies out of it, cards and decks turning over open up from edge-on, a shuffled deck shakes, a rolled die tumbles, and things moved by someone else glide to their new place instead of jumping. Your own drags are not replayed.
+
+They only show a change: the board state never waits for them, and they always end exactly where the server's state says. Nothing animates when your system asks for reduced motion (`prefers-reduced-motion`), when many things change at once (opening a board, a big undo), or when redrawing the board takes longer than a frame on your device (a crowded table on a slow tablet): then changes simply appear. See `src/boardAnimations.ts`.
+=======
 ## Saving and opening boards
 
 The tutor can keep a board for another session: **Board file** (top bar) → **Export board** downloads a `.json` file with everything on the table, including face-down cards, the order of every deck, hands, imported and image decks, and dice with their faces. Pictures go inside the file, so it does not depend on the room it came from.

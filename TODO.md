@@ -18,7 +18,8 @@
 
 
 - [ ] Improve UI for editing chips
-- [ ] There should be animations for shuffling and rolling a die. (Rolling: done, see D-010.)
+- [X] There should be animations for shuffling and rolling a die (and drawing, flipping, and moves by others; see D-012).
+- [ ] Performance with a crowded table: each snapshot redraws the whole board (p95 120–150 ms per frame with 150 cards on the tablet profile), and the objects' blurred shadows are very costly when canvas is drawn without GPU. See D-012.
 - [ ] Things need to allow for more customization than currently allowed. Fraction bars could be configured (colors, numerator, denominator); number tiles could have controls to increase/decrease number of even to type a number.
 - [ ] Add a thing: dominoes
 - [ ] Add a thing: cartesian plane
