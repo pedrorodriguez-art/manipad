@@ -43,6 +43,14 @@ Tap **Die** under *Tabletop* for a classic six-sided die, or **Custom die** for 
 Short animations (150–300 ms) make other people's moves easy to follow: a card drawn from a deck flies out of it, cards and decks turning over open up from edge-on, a shuffled deck shakes, a rolled die tumbles, and things moved by someone else glide to their new place instead of jumping. Your own drags are not replayed.
 
 They only show a change: the board state never waits for them, and they always end exactly where the server's state says. Nothing animates when your system asks for reduced motion (`prefers-reduced-motion`), when many things change at once (opening a board, a big undo), or when redrawing the board takes longer than a frame on your device (a crowded table on a slow tablet): then changes simply appear. See `src/boardAnimations.ts`.
+=======
+## Saving and opening boards
+
+The tutor can keep a board for another session: **Board file** (top bar) → **Export board** downloads a `.json` file with everything on the table, including face-down cards, the order of every deck, hands, imported and image decks, and dice with their faces. Pictures go inside the file, so it does not depend on the room it came from.
+
+**Board file** → **Import board…** opens a saved file in the current room. After a confirmation (*it replaces the board for everyone in this room*), everyone gets the new board at once and their views are fitted to it. Opening a board cannot be undone. Hands keep their owners: whoever comes back from the same browser finds their hand again; the tutor can give the others away.
+
+Only the tutor sees this menu: the file holds every hidden card, and opening one changes the board for everyone. Files from newer versions of ManiPad, damaged files and files over 45 MB are refused with a message, and the board stays as it was. The format is described in `src/shared/boardFile.ts`.
 
 ## Run locally
 

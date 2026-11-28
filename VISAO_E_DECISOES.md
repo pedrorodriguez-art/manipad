@@ -147,6 +147,14 @@ Esta seção separa a motivação original das escolhas observadas na implementa
 
 **Consequência:** desfazer uma rolagem volta ao valor anterior. Isso não permite escolher o resultado, só retornar a um valor que já saiu, e uma nova rolagem é sempre sorteada de novo. As imagens dos dados contam no limite de 30 MB por sala. O gesto de rolar (toque duplo, o padrão, ou toque simples) é uma preferência de cada pessoa, guardada no navegador.
 
+### D-011 — Salvar e abrir a mesa num arquivo JSON, só pelo tutor
+
+**Decisão atual:** o tutor exporta a mesa inteira num arquivo `.json` (`{ format: "manipad-board", version, exportedAt, objects, cardSets, assets }`), com os objetos e conjuntos de cartas exatamente como o servidor os guarda. As imagens que a sala serve (cartas de imagem, faces de dados) entram no próprio arquivo, em base64, em `assets`, e são referidas como `asset:<token>`. Ao importar, o servidor confere tudo antes de mexer na sala: formato, versão, cada objeto e conjunto com os mesmos schemas dos comandos, os códigos de carta contra os conjuntos e as referências de imagem contra as imagens do arquivo. Só então substitui objetos, conjuntos e imagens (com novos tokens), zera o desfazer e manda a nova mesa a todos. As duas operações usam HTTP (`GET`/`PUT /api/rooms/<sala>/board-file`, com o token do tutor), não o socket.
+
+**Razão:** o arquivo precisa reabrir a mesa como ela estava, inclusive as cartas ocultas e a ordem dos montes. Por isso só o tutor pode exportá-lo, e só ele pode importar, já que importar apaga a mesa de todos, como **Clear**. O JSON com base64 dispensa uma biblioteca de zip no cliente e no servidor e continua legível. Um zip quase não diminuiria o arquivo, porque as imagens já são JPEG ou PNG comprimidos; ele só evitaria os 33% do base64. O socket tem limite de 8 MB por mensagem, e uma sala pode ter 30 MB de imagens.
+
+**Consequência:** um arquivo pode ter até 45 MB (os 30 MB de imagens em base64 mais a mesa). Arquivos de versões futuras são recusados com uma mensagem; quando o formato mudar, `version` sobe e o servidor converte os arquivos antigos passo a passo (`BOARD_FILE_MIGRATIONS` em `server/board-file.ts`). Importar não pode ser desfeito, porque o histórico se refere a imagens e conjuntos que deixam de existir. As mãos mantêm o dono pelo id do participante: quem volta pelo mesmo navegador reencontra a sua mão.
+
 ### D-012 — Animações só no cliente, cortadas quando travariam
 
 **Decisão atual:** as animações saem da comparação entre o snapshot anterior e o novo (`src/animationPlan.ts`), depois que a mesa já foi desenhada no estado novo. Os nós do Konva que mudaram são animados até onde o React já os colocou (`src/boardAnimations.ts`):
