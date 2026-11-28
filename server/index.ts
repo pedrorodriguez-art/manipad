@@ -6,11 +6,15 @@ import { Server } from 'socket.io';
 import { commandSchema, joinSchema } from '../src/shared/schemas.js';
 import type { ClientToServerEvents, ServerToClientEvents } from '../src/shared/types.js';
 import { RoomStore, type Room } from './room-store.js';
+import { applyBoardFile, exportBoard, parseBoardFile } from './board-file.js';
+import { BOARD_FILE, BOARD_FILE_MESSAGES } from '../src/shared/boardFile.js';
 
 const app = express(); const server = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, { cors: { origin: true }, maxHttpBufferSize: 8_000_000 });
 const store = new RoomStore();
-app.use(express.json());
+const boardFileJson = express.json({ limit: BOARD_FILE.maxBytes });
+// Board files are large; every other JSON body is small.
+app.use((req, res, next) => (req.path.endsWith('/board-file') ? next() : express.json()(req, res, next)));
 app.get('/api/health', (_req, res) => res.json({ ok: true, rooms: store.rooms.size }));
 app.post('/api/rooms', (_req, res) => { const room = store.create(); res.status(201).json({ roomId: room.id, tutorToken: room.tutorToken }); });
 app.get('/api/rooms/:id', (req, res) => res.json({ exists: Boolean(store.get(req.params.id)) }));
@@ -18,6 +22,31 @@ app.get('/api/rooms/:id', (req, res) => res.json({ exists: Boolean(store.get(req
 app.get('/api/rooms/:id/card-images/:token', (req, res) => {
   const image = store.get(req.params.id)?.cardImages.get(req.params.token); if (!image) return res.sendStatus(404);
   res.set({ 'Content-Type': image.type, 'Cache-Control': 'private, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' }).send(image.data);
+});
+
+/**
+ * Saving and opening a whole board (see D-011). Only the tutor may do either: the file has every hidden card and the deck
+ * order, and opening one replaces the board for everyone, like Clear. The tutor proves it with the room's tutor token.
+ */
+function tutorRoom(req: express.Request, res: express.Response): Room | undefined {
+  const room = store.get(req.params.id as string); if (!room) { res.status(404).json({ message: 'Room not found' }); return undefined; }
+  if (!store.isTutor(room, req.get('X-Tutor-Token') ?? undefined)) { res.status(403).json({ message: 'Only the tutor can save or open a board' }); return undefined; }
+  return room;
+}
+app.get('/api/rooms/:id/board-file', (req, res) => {
+  const room = tutorRoom(req, res); if (!room) return;
+  const day = new Date().toISOString().slice(0, 10);
+  res.set({ 'Content-Disposition': `attachment; filename="manipad-${room.id}-${day}.json"`, 'Cache-Control': 'no-store' }).json(exportBoard(room));
+});
+app.put('/api/rooms/:id/board-file', (req, res, next) => (tutorRoom(req, res) ? next() : undefined), boardFileJson, (req, res) => {
+  const room = store.get(req.params.id as string)!;
+  const board = parseBoardFile(req.body, room); if (!board.ok) return res.status(400).json({ message: board.message });
+  applyBoardFile(room, board); broadcastSnapshot(room); io.to(room.id).emit('view:reset');
+  res.json({ ok: true, objects: room.objects.length });
+});
+// The body parser's own errors (a file that is not JSON, or too large) come back as messages, not as an HTML page.
+app.use('/api/rooms/:id/board-file', (error: { type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  res.status(error.type === 'entity.too.large' ? 413 : 400).json({ message: error.type === 'entity.too.large' ? BOARD_FILE_MESSAGES.tooLarge : BOARD_FILE_MESSAGES.notJson });
 });
 
 io.use((socket, next) => {
